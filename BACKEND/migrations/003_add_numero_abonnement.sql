@@ -1,0 +1,2 @@
+ALTER TABLE abonnements
+ADD COLUMN IF NOT EXISTS numero_abonnement TEXT UNIQUE;

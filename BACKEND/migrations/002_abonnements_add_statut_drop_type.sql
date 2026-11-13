@@ -1,0 +1,3 @@
+ALTER TABLE abonnements
+  ADD COLUMN IF NOT EXISTS statut TEXT,
+  DROP COLUMN IF EXISTS type;
