@@ -13,13 +13,13 @@ export function Register() {
   const [profile, setProfile] = useState("");
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     console.log("Register attempt:", { name, email, password, profile });
     navigate("/client");
   };
 
-  const handleImage = (e) => {
+  const handleImage = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setProfile(URL.createObjectURL(file));

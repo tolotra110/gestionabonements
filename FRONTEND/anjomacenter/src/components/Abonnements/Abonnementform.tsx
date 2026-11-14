@@ -59,7 +59,7 @@ export default function Abonnementform() {
       setSaving(true);
       setError(null);
       const payload = {
-        numero_abonnement: numeroAbonnement || null,
+        numero_abonnement: numeroAbonnement || undefined,
         client,
         statut,
         observation,
