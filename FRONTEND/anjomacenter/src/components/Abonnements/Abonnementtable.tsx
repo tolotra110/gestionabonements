@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pencil, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { CreditCard, Pencil, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { type Abonnement } from "../../types/abonemment";
 import { useNavigate } from "react-router-dom";
 
@@ -90,6 +90,14 @@ export default function AbonnementTable({
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        title="Générer la carte"
+                        onClick={() => navigate(`/carte/${abonnement.id}`)}
+                        className="rounded-lg p-2 text-emerald-600 transition-colors hover:bg-emerald-50"
+                      >
+                        <CreditCard size={17} />
+                      </button>
                       <button
                         type="button"
                         title="Modifier"

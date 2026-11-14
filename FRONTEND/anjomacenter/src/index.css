@@ -1,5 +1,5 @@
 
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Open+Sans:ital,wght@0,600;0,700;0,800;1,700;1,800&family=Roboto:wght@300;400;500;700&display=swap');
 
 @import "tailwindcss";
 
@@ -112,6 +112,12 @@ body {
 }
 
 @media print {
+  body {
+    background: #ffffff !important;
+  }
+  .no-print {
+    display: none !important;
+  }
   body * {
     visibility: hidden;
   }
@@ -123,5 +129,13 @@ body {
     position: absolute;
     left: 0;
     top: 0;
+    width: 100%;
+    gap: 6mm !important;
+  }
+  .print-card-item {
+    width: 85.6mm !important;
+    max-width: 85.6mm !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
   }
 }
