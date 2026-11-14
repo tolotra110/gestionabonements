@@ -82,7 +82,7 @@ export default function Abonnement() {
     <div>
       <div className="flex">
         <Sidebare />
-        <div>
+        <div className="min-w-0 flex-1">
           <Navbar />
           <div className="p-4">
             <h1 className="text-2xl font-bold">ABONNEMENT</h1>
@@ -145,7 +145,7 @@ export default function Abonnement() {
             {loading && <div className="p-6 text-slate-500">Chargement...</div>}
             {error && <div className="p-6 text-red-600">{error}</div>}
             {!loading && !error && (
-              <Abonnementtable items={filtered} onDelete={handleDelete} />
+              <Abonnementtable items={filtered} onDelete={handleDelete} onPaymentChange={load} />
             )}
           </div>
         </div>

@@ -3,9 +3,9 @@ import { Download, Loader2, Search, Wallet } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Sidebare } from "../../components/Sidebar/Sidebare";
 import Navbar from "../../components/Navbar/Navbar";
-import { abonnementService } from "../../services/abonnementService";
+import { paiementService } from "../../services/paiementService";
 import { parametreService } from "../../services/parametreService";
-import type { Abonnement } from "../../types/abonemment";
+import type { Paiement } from "../../types/Paiement";
 
 type Periode = "jour" | "semaine" | "mois" | "tout";
 
@@ -16,26 +16,29 @@ const PERIODES: { valeur: Periode; libelle: string }[] = [
   { valeur: "tout", libelle: "Tout" },
 ];
 
-/** Convertit « 35 000 » ou « 4 000 Ar » en nombre. */
-function parseMontant(prix?: string): number {
-  if (!prix) return 0;
-  const valeur = Number(String(prix).replace(/[^\d.-]/g, ""));
-  return Number.isFinite(valeur) ? valeur : 0;
-}
+const parseMontant = (valeur?: string | number): number => {
+  if (valeur === undefined || valeur === null) return 0;
+  const nombre = Number(String(valeur).replace(/[^\d.-]/g, ""));
+  return Number.isFinite(nombre) ? nombre : 0;
+};
 
-/** Accepte aussi bien « 01/11/2026 » que « 2026-11-01 ». */
+/** Accepte « 2026-11-08 » comme « 08/11/2026 ». */
 function parseDate(date?: string): Date | null {
   if (!date) return null;
+  const valeur = date.trim();
 
-  const fr = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(date.trim());
-  if (fr) {
-    const [, jour, mois, annee] = fr;
-    const valeur = new Date(Number(annee), Number(mois) - 1, Number(jour));
-    return Number.isNaN(valeur.getTime()) ? null : valeur;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(valeur);
+  if (iso) {
+    return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
   }
 
-  const valeur = new Date(date);
-  return Number.isNaN(valeur.getTime()) ? null : valeur;
+  const fr = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(valeur);
+  if (fr) {
+    return new Date(Number(fr[3]), Number(fr[2]) - 1, Number(fr[1]));
+  }
+
+  const dateJs = new Date(valeur);
+  return Number.isNaN(dateJs.getTime()) ? null : dateJs;
 }
 
 function debutPeriode(periode: Periode, reference: Date): Date | null {
@@ -60,7 +63,7 @@ const formatMontant = (valeur: number, devise: string) =>
   `${valeur.toLocaleString("fr-FR").replace(/\u202f|\u00a0/g, " ")} ${devise}`;
 
 export default function Caisse() {
-  const [abonnements, setAbonnements] = useState<Abonnement[]>([]);
+  const [paiements, setPaiements] = useState<Paiement[]>([]);
   const [devise, setDevise] = useState("Ar");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -74,8 +77,8 @@ export default function Caisse() {
       try {
         setLoading(true);
         setError(null);
-        const data = await abonnementService.list();
-        if (!ignore) setAbonnements(data);
+        const data = await paiementService.list();
+        if (!ignore) setPaiements(data);
       } catch (e) {
         if (!ignore) setError(e instanceof Error ? e.message : "Erreur de chargement");
       } finally {
@@ -101,14 +104,14 @@ export default function Caisse() {
 
   const encaissements = useMemo(
     () =>
-      abonnements
-        .map((abonnement) => ({
-          ...abonnement,
-          datePaiement: parseDate(abonnement.dateDebut) ?? parseDate(abonnement.created_at ?? undefined),
-          montant: parseMontant(abonnement.prix),
+      paiements
+        .map((paiement) => ({
+          ...paiement,
+          datePaiement: parseDate(paiement.date_paiement),
+          montant: parseMontant(paiement.montant),
         }))
         .sort((a, b) => (b.datePaiement?.getTime() ?? 0) - (a.datePaiement?.getTime() ?? 0)),
-    [abonnements]
+    [paiements]
   );
 
   const totaux = useMemo(() => {
@@ -139,7 +142,7 @@ export default function Caisse() {
     return encaissements.filter((item) => {
       if (debut && (!item.datePaiement || item.datePaiement < debut)) return false;
       if (!terme) return true;
-      return `${item.client ?? ""} ${item.numero_abonnement ?? ""} ${item.offre ?? ""}`
+      return `${item.client ?? ""} ${item.numero_abonnement ?? ""} ${item.offre ?? ""} ${item.methode ?? ""}`
         .toLowerCase()
         .includes(terme);
     });
@@ -149,19 +152,27 @@ export default function Caisse() {
 
   const exporterExcel = () => {
     const rows: (string | number)[][] = [
-      ["Date", "Client", "N° abonnement", "Offre", `Montant (${devise})`],
+      ["Date", "Client", "N° abonnement", "Offre", "Méthode", `Montant (${devise})`],
       ...filtres.map((item) => [
         item.datePaiement ? item.datePaiement.toLocaleDateString("fr-FR") : "",
         item.client ?? "",
-        item.numero_abonnement ?? `#${item.id}`,
+        item.numero_abonnement ?? `#${item.abonnement_id}`,
         item.offre ?? "",
+        item.methode ?? "",
         item.montant,
       ]),
-      ["Total", "", "", "", totalFiltre],
+      ["Total", "", "", "", "", totalFiltre],
     ];
 
     const worksheet = XLSX.utils.aoa_to_sheet(rows);
-    worksheet["!cols"] = [{ wch: 14 }, { wch: 24 }, { wch: 20 }, { wch: 16 }, { wch: 16 }];
+    worksheet["!cols"] = [
+      { wch: 14 },
+      { wch: 24 },
+      { wch: 20 },
+      { wch: 16 },
+      { wch: 14 },
+      { wch: 16 },
+    ];
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Caisse");
@@ -179,7 +190,7 @@ export default function Caisse() {
 
         <div className="p-6">
           <h1 className="text-2xl font-bold text-gray-800">CAISSE</h1>
-          <p className="text-sm text-slate-500">Encaissements des abonnements</p>
+          <p className="text-sm text-slate-500">Encaissements et versements des abonnements</p>
 
           {loading && (
             <div className="mt-6 flex items-center gap-2 text-slate-500">
@@ -224,7 +235,9 @@ export default function Caisse() {
                   <p className="mt-2 text-2xl font-bold text-slate-800">
                     {formatMontant(totaux.total, devise)}
                   </p>
-                  <p className="mt-1 text-xs text-slate-400">{encaissements.length} abonnements</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {encaissements.length} versement{encaissements.length > 1 ? "s" : ""}
+                  </p>
                 </div>
               </div>
 
@@ -278,6 +291,7 @@ export default function Caisse() {
                       <th className="px-4 py-3 font-semibold">Client</th>
                       <th className="px-4 py-3 font-semibold">N° abonnement</th>
                       <th className="px-4 py-3 font-semibold">Offre</th>
+                      <th className="px-4 py-3 font-semibold">Méthode</th>
                       <th className="px-4 py-3 text-right font-semibold">Montant</th>
                     </tr>
                   </thead>
@@ -292,9 +306,10 @@ export default function Caisse() {
                         </td>
                         <td className="px-4 py-3 font-medium text-slate-800">{item.client}</td>
                         <td className="px-4 py-3 text-slate-600">
-                          {item.numero_abonnement || `#${item.id}`}
+                          {item.numero_abonnement || `#${item.abonnement_id}`}
                         </td>
                         <td className="px-4 py-3 text-slate-600">{item.offre || "—"}</td>
+                        <td className="px-4 py-3 text-slate-600">{item.methode || "—"}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-800">
                           {formatMontant(item.montant, devise)}
                         </td>
@@ -305,7 +320,10 @@ export default function Caisse() {
                   {filtres.length > 0 && (
                     <tfoot className="border-t border-gray-100 bg-slate-50">
                       <tr>
-                        <td className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500" colSpan={4}>
+                        <td
+                          className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500"
+                          colSpan={5}
+                        >
                           Total ({filtres.length})
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-right font-bold text-slate-800">

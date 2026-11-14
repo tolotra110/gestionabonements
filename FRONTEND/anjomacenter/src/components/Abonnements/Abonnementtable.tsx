@@ -1,19 +1,32 @@
 import { useEffect, useMemo, useState } from "react";
-import { CreditCard, Pencil, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { CreditCard, Pencil, Trash2, ChevronLeft, ChevronRight, Wallet } from "lucide-react";
+import PaiementsModal from "../Paiements/PaiementsModal";
 import { type Abonnement } from "../../types/abonemment";
 import { useNavigate } from "react-router-dom";
 
 const ITEMS_PER_PAGE = 8;
 
+const parseMontant = (valeur?: string | number): number => {
+  if (valeur === undefined || valeur === null) return 0;
+  const nombre = Number(String(valeur).replace(/[^\d.-]/g, ""));
+  return Number.isFinite(nombre) ? nombre : 0;
+};
+
+const formatMontant = (valeur: number) =>
+  valeur.toLocaleString("fr-FR").replace(/\u202f|\u00a0/g, " ");
+
 export default function AbonnementTable({
   items,
   onDelete,
+  onPaymentChange,
 }: {
   items: Abonnement[];
   onDelete: (a: Abonnement) => void;
+  onPaymentChange?: () => void;
 }) {
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
+  const [paiementDe, setPaiementDe] = useState<Abonnement | null>(null);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -44,15 +57,15 @@ export default function AbonnementTable({
         <table className="w-full text-left text-sm">
           <thead className="bg-gray-50">
             <tr className="text-gray-500">
-              <th className="px-6 py-4 font-medium">N° Abonnement</th>
-              <th className="px-6 py-4 font-medium">Client</th>
-              <th className="px-6 py-4 font-medium">Offre</th>
-              <th className="px-6 py-4 font-medium">Prix</th>
-              <th className="px-6 py-4 font-medium">Date début</th>
-              <th className="px-6 py-4 font-medium">Date fin</th>
-              <th className="px-6 py-4 font-medium">Observation</th>
-              <th className="px-6 py-4 font-medium">Statut</th>
-              <th className="px-6 py-4 text-center font-medium">Actions</th>
+              <th className="px-4 py-4 font-medium">N° Abonnement</th>
+              <th className="px-4 py-4 font-medium">Client</th>
+              <th className="px-4 py-4 font-medium">Offre</th>
+              <th className="px-4 py-4 font-medium">Prix</th>
+              <th className="px-4 py-4 font-medium">Date début</th>
+              <th className="px-4 py-4 font-medium">Date fin</th>
+              <th className="px-4 py-4 font-medium">Observation</th>
+              <th className="px-4 py-4 font-medium">Statut</th>
+              <th className="px-4 py-4 text-center font-medium">Actions</th>
             </tr>
           </thead>
 
@@ -62,23 +75,34 @@ export default function AbonnementTable({
               const actif = statut === "ACTIF";
               return (
                 <tr key={abonnement.id} className="transition-colors hover:bg-gray-50">
-                  <td className="px-6 py-4">
+                  <td className="px-4 py-4">
                     <div className="font-medium text-gray-800">{abonnement.numero_abonnement || `#${abonnement.id}`}</div>
                     <div className="text-xs text-gray-400">ID {abonnement.id}</div>
                   </td>
-                  <td className="px-6 py-4 font-medium text-gray-800">{abonnement.client}</td>
-                  <td className="px-6 py-4">
-                    <span className="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600">
+                  <td className="px-4 py-4 font-medium text-gray-800">{abonnement.client}</td>
+                  <td className="px-4 py-4">
+                    <span className="whitespace-nowrap rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600">
                       {abonnement.offre}
                     </span>
                   </td>
-                  <td className="px-6 py-4 font-medium text-gray-800">{abonnement.prix}</td>
-                  <td className="px-6 py-4 text-gray-600">{abonnement.dateDebut}</td>
-                  <td className="px-6 py-4 text-gray-600">{abonnement.dateFin}</td>
-                  <td className="max-w-[200px] px-6 py-4 text-gray-500">
+                  <td className="whitespace-nowrap px-4 py-4">
+                    <div className="font-medium text-gray-800">{abonnement.prix}</div>
+                    {parseMontant(abonnement.montant_paye) > 0 && (
+                      <div className="text-xs text-gray-400">
+                        Payé {formatMontant(parseMontant(abonnement.montant_paye))}
+                        {" · "}Reste{" "}
+                        {formatMontant(
+                          Math.max(0, parseMontant(abonnement.prix) - parseMontant(abonnement.montant_paye))
+                        )}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-4 text-gray-600">{abonnement.dateDebut}</td>
+                  <td className="px-4 py-4 text-gray-600">{abonnement.dateFin}</td>
+                  <td className="max-w-[200px] px-4 py-4 text-gray-500">
                     <span className="block truncate">{abonnement.observation}</span>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-4 py-4">
                     <span
                       className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-medium ${
                         actif ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
@@ -88,8 +112,16 @@ export default function AbonnementTable({
                       {abonnement.statut || "—"}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-4 py-4">
                     <div className="flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        title="Paiements"
+                        onClick={() => setPaiementDe(abonnement)}
+                        className="rounded-lg p-2 text-amber-600 transition-colors hover:bg-amber-50"
+                      >
+                        <Wallet size={17} />
+                      </button>
                       <button
                         type="button"
                         title="Générer la carte"
@@ -130,7 +162,7 @@ export default function AbonnementTable({
         </table>
       </div>
 
-      <div className="flex shrink-0 items-center justify-between border-t border-gray-100 px-6 py-4">
+      <div className="flex shrink-0 items-center justify-between border-t border-gray-100 px-4 py-4">
         <p className="text-sm text-gray-500">
           Total : <span className="font-semibold text-gray-700">{items.length}</span> abonnements
         </p>
@@ -159,6 +191,14 @@ export default function AbonnementTable({
           </button>
         </div>
       </div>
+
+      {paiementDe && (
+        <PaiementsModal
+          abonnement={paiementDe}
+          onClose={() => setPaiementDe(null)}
+          onChanged={onPaymentChange}
+        />
+      )}
     </div>
   );
 }

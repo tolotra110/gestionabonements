@@ -8,6 +8,7 @@ export interface Abonnement {
   offre?: string;
   observation?: string;
   statut?: string;
+  montant_paye?: number | string;
   created_at?: string;
 }
 

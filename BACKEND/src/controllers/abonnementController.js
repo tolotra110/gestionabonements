@@ -2,7 +2,12 @@
 
 export const getAbonnements = async (req, res) => {
   try {
-    const { rows } = await query('SELECT * FROM abonnements ORDER BY created_at DESC');
+    const { rows } = await query(`
+      SELECT a.*,
+             COALESCE((SELECT SUM(p.montant) FROM paiements p WHERE p.abonnement_id = a.id), 0) AS montant_paye
+      FROM abonnements a
+      ORDER BY a.created_at DESC
+    `);
     res.json(rows);
   } catch (error) {
     res.status(500).json({ message: error.message });

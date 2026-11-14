@@ -3,7 +3,11 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const { Pool } = pg;
+const { Pool, types } = pg;
+
+// Les colonnes DATE restent au format « AAAA-MM-JJ » au lieu d'être
+// converties en Date JS, ce qui décalait les jours selon le fuseau horaire.
+types.setTypeParser(1082, (valeur) => valeur);
 
 if (!process.env.DATABASE_URL) {
   console.error('Missing DATABASE_URL in .env');
