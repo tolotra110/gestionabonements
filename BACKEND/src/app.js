@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import clientRoutes from './routes/clientRoutes.js';
 import abonnementRoutes from './routes/abonnementRoutes.js';
+import parametreRoutes from './routes/parametreRoutes.js';
 
 dotenv.config();
 
@@ -17,6 +18,7 @@ app.get('/', (req, res) => {
 
 app.use('/api/clients', clientRoutes);
 app.use('/api/abonnements', abonnementRoutes);
+app.use('/api/parametres', parametreRoutes);
 
 export default app;
 

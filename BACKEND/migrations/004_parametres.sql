@@ -1,0 +1,13 @@
+CREATE TABLE IF NOT EXISTS parametres (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  nom_zone TEXT NOT NULL DEFAULT 'ANJOMA WIFI ZONE',
+  adresse TEXT NOT NULL DEFAULT '',
+  telephone TEXT NOT NULL DEFAULT '',
+  email TEXT NOT NULL DEFAULT '',
+  devise TEXT NOT NULL DEFAULT 'Ar',
+  duree_abonnement_jours INTEGER NOT NULL DEFAULT 30,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT parametres_ligne_unique CHECK (id = 1)
+);
+
+INSERT INTO parametres (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
