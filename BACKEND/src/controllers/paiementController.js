@@ -7,7 +7,10 @@ const SELECT_PAIEMENTS = `
          a.client,
          a.numero_abonnement,
          a.offre,
-         a.prix AS prix_abonnement
+         a.prix AS prix_abonnement,
+         a."dateDebut" AS abonnement_debut,
+         a."dateFin" AS abonnement_fin,
+         a.statut AS abonnement_statut
   FROM paiements p
   JOIN abonnements a ON a.id = p.abonnement_id
 `;
@@ -18,6 +21,16 @@ export const getPaiements = async (req, res) => {
   try {
     const { rows } = await query(`${SELECT_PAIEMENTS} ORDER BY p.date_paiement DESC, p.id DESC`);
     res.json(rows);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const getPaiement = async (req, res) => {
+  try {
+    const { rows } = await query(`${SELECT_PAIEMENTS} WHERE p.id = $1`, [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ message: 'Paiement non trouvé' });
+    res.json(rows[0]);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

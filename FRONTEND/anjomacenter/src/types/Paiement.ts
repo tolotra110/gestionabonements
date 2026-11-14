@@ -10,6 +10,9 @@ export interface Paiement {
   numero_abonnement?: string;
   offre?: string;
   prix_abonnement?: string;
+  abonnement_debut?: string;
+  abonnement_fin?: string;
+  abonnement_statut?: string;
 }
 
 export interface PaiementInput {

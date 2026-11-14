@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, Loader2, Search, Wallet } from "lucide-react";
+import { Download, Loader2, Printer, Search, Wallet } from "lucide-react";
+import { Link } from "react-router-dom";
 import * as XLSX from "xlsx";
 import { Sidebare } from "../../components/Sidebar/Sidebare";
 import Navbar from "../../components/Navbar/Navbar";
@@ -293,6 +294,7 @@ export default function Caisse() {
                       <th className="px-4 py-3 font-semibold">Offre</th>
                       <th className="px-4 py-3 font-semibold">Méthode</th>
                       <th className="px-4 py-3 text-right font-semibold">Montant</th>
+                      <th className="px-4 py-3 text-center font-semibold">Reçu</th>
                     </tr>
                   </thead>
 
@@ -313,6 +315,15 @@ export default function Caisse() {
                         <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-800">
                           {formatMontant(item.montant, devise)}
                         </td>
+                        <td className="px-4 py-3 text-center">
+                          <Link
+                            to={`/recu/${item.id}`}
+                            title="Imprimer le reçu"
+                            className="inline-flex rounded-lg p-1.5 text-blue-600 transition hover:bg-blue-50"
+                          >
+                            <Printer size={16} />
+                          </Link>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -329,6 +340,7 @@ export default function Caisse() {
                         <td className="whitespace-nowrap px-4 py-3 text-right font-bold text-slate-800">
                           {formatMontant(totalFiltre, devise)}
                         </td>
+                        <td />
                       </tr>
                     </tfoot>
                   )}

@@ -138,4 +138,16 @@ body {
     box-shadow: none !important;
     page-break-inside: avoid;
   }
+  #recu-a-imprimer,
+  #recu-a-imprimer * {
+    visibility: visible;
+  }
+  #recu-a-imprimer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
 }

@@ -10,6 +10,7 @@ import Abonnementform from "./components/Abonnements/Abonnementform"
 import Dashboard from "./pages/Dashboard/Dashboard"
 import Caisse from "./pages/Caisse/Caisse"
 import Parametre from "./pages/Parametre/Parametre"
+import Recu from "./pages/Recu/Recu"
 function App() {
   return (
     <div className="App">
@@ -28,6 +29,7 @@ function App() {
         <Route path="/abonnementform/:id" element={<Abonnementform/>}/>
         <Route path="/caisse" element={<Caisse/>}/>
         <Route path="/parametre" element={<Parametre/>}/>
+        <Route path="/recu/:id" element={<Recu/>}/>
         </Routes>
 
     </div>
