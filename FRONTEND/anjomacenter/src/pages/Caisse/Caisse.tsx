@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Search, Wallet } from "lucide-react";
+import { Download, Loader2, Search, Wallet } from "lucide-react";
+import * as XLSX from "xlsx";
 import { Sidebare } from "../../components/Sidebar/Sidebare";
 import Navbar from "../../components/Navbar/Navbar";
 import { abonnementService } from "../../services/abonnementService";
@@ -146,6 +147,29 @@ export default function Caisse() {
 
   const totalFiltre = filtres.reduce((somme, item) => somme + item.montant, 0);
 
+  const exporterExcel = () => {
+    const rows: (string | number)[][] = [
+      ["Date", "Client", "N° abonnement", "Offre", `Montant (${devise})`],
+      ...filtres.map((item) => [
+        item.datePaiement ? item.datePaiement.toLocaleDateString("fr-FR") : "",
+        item.client ?? "",
+        item.numero_abonnement ?? `#${item.id}`,
+        item.offre ?? "",
+        item.montant,
+      ]),
+      ["Total", "", "", "", totalFiltre],
+    ];
+
+    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+    worksheet["!cols"] = [{ wch: 14 }, { wch: 24 }, { wch: 20 }, { wch: 16 }, { wch: 16 }];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Caisse");
+
+    const aujourdhui = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(workbook, `caisse-${periode}-${aujourdhui}.xlsx`);
+  };
+
   return (
     <div className="flex min-h-screen bg-slate-50">
       <Sidebare />
@@ -218,7 +242,17 @@ export default function Caisse() {
                   />
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={exporterExcel}
+                    disabled={filtres.length === 0}
+                    className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Download size={16} />
+                    Exporter Excel
+                  </button>
+
                   {PERIODES.map((item) => (
                     <button
                       key={item.valeur}
