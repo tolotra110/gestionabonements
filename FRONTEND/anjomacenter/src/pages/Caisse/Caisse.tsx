@@ -1,364 +1,836 @@
-import { useEffect, useMemo, useState } from "react";
-import { Download, Loader2, Printer, Search, Wallet } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import * as XLSX from "xlsx";
+import {
+  ArrowDown,
+  CalendarDays,
+  Download,
+  Eye,
+  MoreVertical,
+  Pencil,
+  Plus,
+  Printer,
+  RotateCcw,
+  RefreshCw,
+  Search,
+  Trash2,
+  TrendingUp,
+  Wallet,
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { paiementService } from "../../services/paiementService";
 import { Sidebare } from "../../components/Sidebar/Sidebare";
 import Navbar from "../../components/Navbar/Navbar";
-import { paiementService } from "../../services/paiementService";
-import { parametreService } from "../../services/parametreService";
-import type { Paiement } from "../../types/Paiement";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../../components/ui/alert-dialog";
+import { Button } from "../../components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../../components/ui/dialog";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../../components/ui/dropdown-menu";
+import { caisseService } from "../../services/caisseService";
+import type {
+  CaisseOperation,
+  CaisseOperationInput,
+  CaisseOperationType,
+} from "../../types/Caisse";
 
-type Periode = "jour" | "semaine" | "mois" | "tout";
-
-const PERIODES: { valeur: Periode; libelle: string }[] = [
-  { valeur: "jour", libelle: "Aujourd'hui" },
-  { valeur: "semaine", libelle: "Cette semaine" },
-  { valeur: "mois", libelle: "Ce mois" },
-  { valeur: "tout", libelle: "Tout" },
-];
-
-const parseMontant = (valeur?: string | number): number => {
-  if (valeur === undefined || valeur === null) return 0;
-  const nombre = Number(String(valeur).replace(/[^\d.-]/g, ""));
-  return Number.isFinite(nombre) ? nombre : 0;
+const parseMontant = (valeur: number | string) => {
+  const montant = Number(String(valeur).replace(/[^\d.-]/g, ""));
+  return Number.isFinite(montant) ? montant : 0;
 };
 
-/** Accepte « 2026-11-08 » comme « 08/11/2026 ». */
-function parseDate(date?: string): Date | null {
-  if (!date) return null;
-  const valeur = date.trim();
+const formatMontant = (valeur: number) =>
+  `${valeur.toLocaleString("fr-FR").replace(/\u202f|\u00a0/g, " ")} Ar`;
 
+const formatDate = (valeur: string) => {
   const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(valeur);
-  if (iso) {
-    return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
-  }
+  return iso ? `${iso[3]}/${iso[2]}/${iso[1]}` : valeur;
+};
 
-  const fr = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(valeur);
-  if (fr) {
-    return new Date(Number(fr[3]), Number(fr[2]) - 1, Number(fr[1]));
-  }
+const dateDuJour = () => {
+  const maintenant = new Date();
+  const mois = String(maintenant.getMonth() + 1).padStart(2, "0");
+  const jour = String(maintenant.getDate()).padStart(2, "0");
+  return `${maintenant.getFullYear()}-${mois}-${jour}`;
+};
 
-  const dateJs = new Date(valeur);
-  return Number.isNaN(dateJs.getTime()) ? null : dateJs;
+type CaisseOperationAvecSolde = CaisseOperation & { solde: number };
+
+function Statistique({
+  titre,
+  valeur,
+  icon,
+}: {
+  titre: string;
+  valeur: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <Card className="gap-0 border-blue-100 bg-white py-4 shadow-sm shadow-slate-200/50">
+      <CardHeader className="flex flex-row items-center justify-between px-4 pb-0">
+        <CardTitle className="text-sm font-normal text-slate-500">{titre}</CardTitle>
+        <span className="flex size-9 items-center justify-center rounded-full bg-blue-50 text-blue-600 [&_svg]:size-4">
+          {icon}
+        </span>
+      </CardHeader>
+      <CardContent className="px-4 pt-2">
+        <p className="text-2xl font-semibold tabular-nums text-slate-900">{valeur}</p>
+      </CardContent>
+    </Card>
+  );
 }
 
-function debutPeriode(periode: Periode, reference: Date): Date | null {
-  if (periode === "tout") return null;
+function FormulaireOperation({
+  type,
+  onCreated,
+}: {
+  type: CaisseOperationType;
+  onCreated: () => Promise<void>;
+}) {
+  const recette = type === "RECETTE";
+  const [montant, setMontant] = useState("");
+  const [motif, setMotif] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const debut = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate());
+  const ajouter = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const montantNumerique = Number(montant);
+    if (!Number.isFinite(montantNumerique) || montantNumerique <= 0) {
+      setError("Saisissez un montant supérieur à 0.");
+      return;
+    }
+    if (!motif.trim()) {
+      setError("Le motif est obligatoire.");
+      return;
+    }
 
-  if (periode === "jour") return debut;
+    const operation: CaisseOperationInput = {
+      type,
+      montant: montantNumerique,
+      date_operation: dateDuJour(),
+      motif: motif.trim(),
+    };
 
-  if (periode === "semaine") {
-    // Semaine commençant le lundi
-    const decalage = (debut.getDay() + 6) % 7;
-    debut.setDate(debut.getDate() - decalage);
-    return debut;
-  }
+    try {
+      setSaving(true);
+      setError(null);
+      await caisseService.create(operation);
+      setMontant("");
+      setMotif("");
+      await onCreated();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Impossible d’enregistrer l’opération.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
-  debut.setDate(1);
-  return debut;
+  return (
+    <Card className="gap-0 border-blue-100 bg-white shadow-sm shadow-slate-200/50">
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-2">
+          <span className="flex size-8 items-center justify-center rounded-full bg-blue-600 text-white">
+            {recette ? <Plus className="size-4" /> : <ArrowDown className="size-4" />}
+          </span>
+          <div>
+            <CardTitle className="text-base font-semibold">
+              Formulaire {recette ? "recette" : "dépense"}
+            </CardTitle>
+            <CardDescription className="text-xs">
+              {recette ? "Ajouter une recette ponctuelle" : "Enregistrer une dépense"}
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={ajouter} className="space-y-3">
+          <div className="space-y-1.5">
+            <label htmlFor={`${type}-montant`} className="text-sm font-medium">
+              Montant (Ar)
+            </label>
+            <Input
+              id={`${type}-montant`}
+              type="number"
+              min="0.01"
+              step="any"
+              required
+              value={montant}
+              onChange={(event) => setMontant(event.target.value)}
+              placeholder="Saisir le montant"
+              className="focus-visible:border-blue-600 focus-visible:ring-blue-600/20"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor={`${type}-motif`} className="text-sm font-medium">
+              Motif
+            </label>
+            <Input
+              id={`${type}-motif`}
+              required
+              maxLength={300}
+              value={motif}
+              onChange={(event) => setMotif(event.target.value)}
+              placeholder={recette ? "Ex. Vente de produits" : "Ex. Achat de fournitures"}
+              className="focus-visible:border-blue-600 focus-visible:ring-blue-600/20"
+            />
+          </div>
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
+          <Button
+            type="submit"
+            disabled={saving}
+            className="w-full bg-blue-600 text-white hover:bg-blue-700"
+          >
+            <Plus />
+            {saving ? "Enregistrement..." : `Ajouter ${recette ? "une recette" : "une dépense"}`}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
 }
 
-const formatMontant = (valeur: number, devise: string) =>
-  `${valeur.toLocaleString("fr-FR").replace(/\u202f|\u00a0/g, " ")} ${devise}`;
+function ModifierOperationDialog({
+  operation,
+  onClose,
+  onSaved,
+}: {
+  operation: CaisseOperation;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const [montant, setMontant] = useState(String(operation.montant));
+  const [date, setDate] = useState(operation.date_operation);
+  const [motif, setMotif] = useState(operation.motif);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const enregistrer = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const montantNumerique = Number(montant);
+    if (!Number.isFinite(montantNumerique) || montantNumerique <= 0 || !motif.trim()) {
+      setError("Saisissez un montant valide et un motif.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setError(null);
+      await caisseService.update(operation.source_id, {
+        type: operation.type,
+        montant: montantNumerique,
+        date_operation: date,
+        motif: motif.trim(),
+      });
+      await onSaved();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Impossible de modifier l’opération.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Modifier l’opération</DialogTitle>
+          <DialogDescription>Modifiez le montant, la date ou le motif.</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={enregistrer} className="space-y-3">
+          <div className="space-y-1.5">
+            <label htmlFor="caisse-edit-montant" className="text-sm font-medium">Montant (Ar)</label>
+            <Input
+              id="caisse-edit-montant"
+              type="number"
+              min="0.01"
+              step="any"
+              required
+              value={montant}
+              onChange={(event) => setMontant(event.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="caisse-edit-date" className="text-sm font-medium">Date</label>
+            <Input
+              id="caisse-edit-date"
+              type="date"
+              required
+              value={date}
+              onChange={(event) => setDate(event.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="caisse-edit-motif" className="text-sm font-medium">Motif</label>
+            <Input
+              id="caisse-edit-motif"
+              required
+              maxLength={300}
+              value={motif}
+              onChange={(event) => setMotif(event.target.value)}
+            />
+          </div>
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>Annuler</Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? "Enregistrement..." : "Enregistrer"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function Caisse() {
-  const [paiements, setPaiements] = useState<Paiement[]>([]);
-  const [devise, setDevise] = useState("Ar");
+  const navigate = useNavigate();
+  const [operations, setOperations] = useState<CaisseOperation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [periode, setPeriode] = useState<Periode>("mois");
-  const [recherche, setRecherche] = useState("");
+  const [search, setSearch] = useState("");
+  const [dateDebut, setDateDebut] = useState("");
+  const [dateFin, setDateFin] = useState("");
+  const [operationASupprimer, setOperationASupprimer] = useState<CaisseOperationAvecSolde | null>(null);
+  const [operationAModifier, setOperationAModifier] = useState<CaisseOperationAvecSolde | null>(null);
+  const [operationAVisualiser, setOperationAVisualiser] = useState<CaisseOperationAvecSolde | null>(null);
+  const [operationAImprimer, setOperationAImprimer] = useState<CaisseOperationAvecSolde | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setOperations(await caisseService.list());
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Impossible de charger les opérations.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let ignore = false;
-
-    (async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await paiementService.list();
-        if (!ignore) setPaiements(data);
-      } catch (e) {
-        if (!ignore) setError(e instanceof Error ? e.message : "Erreur de chargement");
-      } finally {
-        if (!ignore) setLoading(false);
-      }
-    })();
-
-    parametreService
-      .get()
-      .then((p) => {
-        if (!ignore && p.devise) setDevise(p.devise);
+    let active = true;
+    caisseService
+      .list()
+      .then((data) => {
+        if (active) setOperations(data);
       })
-      .catch(() => {
-        /* la devise reste « Ar » si les paramètres sont indisponibles */
+      .catch((e: unknown) => {
+        if (active) {
+          setError(e instanceof Error ? e.message : "Impossible de charger les opérations.");
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
 
     return () => {
-      ignore = true;
+      active = false;
     };
   }, []);
 
-  const reference = useMemo(() => new Date(), []);
+  useEffect(() => {
+    if (!operationAImprimer) return;
+    const timer = window.setTimeout(() => {
+      window.print();
+      setOperationAImprimer(null);
+    }, 100);
+    return () => window.clearTimeout(timer);
+  }, [operationAImprimer]);
 
-  const encaissements = useMemo(
+  const operationsAvecSolde = useMemo(() => {
+    const chronologiques = [...operations].sort(
+      (a, b) =>
+        a.date_operation.localeCompare(b.date_operation) ||
+        a.source.localeCompare(b.source) ||
+        a.source_id - b.source_id
+    );
+    const soldes = new Map<string, number>();
+    let solde = 0;
+
+    for (const operation of chronologiques) {
+      const montant = parseMontant(operation.montant);
+      solde += operation.type === "RECETTE" ? montant : -montant;
+      soldes.set(operation.id, solde);
+    }
+
+    return operations.map((operation) => ({
+      ...operation,
+      solde: soldes.get(operation.id) ?? 0,
+    }));
+  }, [operations]);
+
+  const operationsPeriode = useMemo(
     () =>
-      paiements
-        .map((paiement) => ({
-          ...paiement,
-          datePaiement: parseDate(paiement.date_paiement),
-          montant: parseMontant(paiement.montant),
-        }))
-        .sort((a, b) => (b.datePaiement?.getTime() ?? 0) - (a.datePaiement?.getTime() ?? 0)),
-    [paiements]
+      operationsAvecSolde.filter(
+        (operation) =>
+          (!dateDebut || operation.date_operation >= dateDebut) &&
+          (!dateFin || operation.date_operation <= dateFin)
+      ),
+    [dateDebut, dateFin, operationsAvecSolde]
   );
 
-  const totaux = useMemo(() => {
-    const aujourdhui = debutPeriode("jour", reference) as Date;
-    const debutMois = debutPeriode("mois", reference) as Date;
+  const totaux = useMemo(
+    () =>
+      operationsPeriode.reduce(
+        (total, operation) => {
+          if (operation.type === "RECETTE") total.recettes += parseMontant(operation.montant);
+          else total.depenses += parseMontant(operation.montant);
+          return total;
+        },
+        { recettes: 0, depenses: 0 }
+      ),
+    [operationsPeriode]
+  );
 
-    return encaissements.reduce(
-      (acc, item) => {
-        if (!item.datePaiement) return acc;
-        if (item.datePaiement >= aujourdhui) {
-          acc.jour += item.montant;
-          acc.nombreJour += 1;
-        }
-        if (item.datePaiement >= debutMois) {
-          acc.mois += item.montant;
-        }
-        acc.total += item.montant;
-        return acc;
-      },
-      { jour: 0, mois: 0, total: 0, nombreJour: 0 }
-    );
-  }, [encaissements, reference]);
+  const operationsVisibles = useMemo(() => {
+    const recherche = search.trim().toLocaleLowerCase("fr");
+    return operationsPeriode
+      .filter((operation) =>
+        `${operation.motif} ${operation.client ?? ""} ${operation.type}`
+          .toLocaleLowerCase("fr")
+          .includes(recherche)
+      )
+      .sort(
+        (a, b) =>
+          b.date_operation.localeCompare(a.date_operation) ||
+          b.source.localeCompare(a.source) ||
+          b.source_id - a.source_id
+      );
+  }, [operationsPeriode, search]);
 
-  const filtres = useMemo(() => {
-    const debut = debutPeriode(periode, reference);
-    const terme = recherche.trim().toLowerCase();
+  const supprimer = async (operation: CaisseOperation) => {
+    try {
+      setError(null);
+      if (operation.source === "caisse") {
+        await caisseService.remove(operation.source_id);
+      } else {
+        await paiementService.remove(operation.source_id);
+      }
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Impossible de supprimer cette opération.");
+    }
+  };
 
-    return encaissements.filter((item) => {
-      if (debut && (!item.datePaiement || item.datePaiement < debut)) return false;
-      if (!terme) return true;
-      return `${item.client ?? ""} ${item.numero_abonnement ?? ""} ${item.offre ?? ""} ${item.methode ?? ""}`
-        .toLowerCase()
-        .includes(terme);
-    });
-  }, [encaissements, periode, reference, recherche]);
-
-  const totalFiltre = filtres.reduce((somme, item) => somme + item.montant, 0);
-
-  const exporterExcel = () => {
-    const rows: (string | number)[][] = [
-      ["Date", "Client", "N° abonnement", "Offre", "Méthode", `Montant (${devise})`],
-      ...filtres.map((item) => [
-        item.datePaiement ? item.datePaiement.toLocaleDateString("fr-FR") : "",
-        item.client ?? "",
-        item.numero_abonnement ?? `#${item.abonnement_id}`,
-        item.offre ?? "",
-        item.methode ?? "",
-        item.montant,
+  const exporter = () => {
+    const lignes = [
+      ["N°", "Date", "Motif", "Dépense", "Recette", "Solde"],
+      ...operationsVisibles.map((operation, index) => [
+        String(index + 1).padStart(3, "0"),
+        formatDate(operation.date_operation),
+        operation.motif,
+        operation.type === "DEPENSE" ? parseMontant(operation.montant) : 0,
+        operation.type === "RECETTE" ? parseMontant(operation.montant) : 0,
+        operation.solde,
       ]),
-      ["Total", "", "", "", "", totalFiltre],
     ];
-
-    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+    const worksheet = XLSX.utils.aoa_to_sheet(lignes);
     worksheet["!cols"] = [
+      { wch: 8 },
       { wch: 14 },
-      { wch: 24 },
-      { wch: 20 },
-      { wch: 16 },
-      { wch: 14 },
-      { wch: 16 },
+      { wch: 36 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 18 },
     ];
-
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Caisse");
-
-    const aujourdhui = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(workbook, `caisse-${periode}-${aujourdhui}.xlsx`);
+    XLSX.writeFile(workbook, "operations-caisse.xlsx");
   };
+
+  const datesInvalides = Boolean(dateDebut && dateFin && dateDebut > dateFin);
 
   return (
     <div className="flex min-h-screen bg-slate-50">
       <Sidebare />
-
       <div className="min-w-0 flex-1">
         <Navbar />
+        <main className="space-y-5 p-4 sm:p-6">
+          <header className="flex flex-col gap-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Caisse</h1>
+            <p className="text-sm text-slate-500">Suivez les recettes, les dépenses et le solde.</p>
+          </header>
 
-        <div className="p-6">
-          <h1 className="text-2xl font-bold text-gray-800">CAISSE</h1>
-          <p className="text-sm text-slate-500">Encaissements et versements des abonnements</p>
+          <section className="grid gap-3 sm:grid-cols-3" aria-label="Résumé de la caisse">
+            <Statistique
+              titre="Total solde"
+              valeur={loading ? "—" : formatMontant(totaux.recettes - totaux.depenses)}
+              icon={<TrendingUp />}
+            />
+            <Statistique
+              titre="Total dépensé"
+              valeur={loading ? "—" : formatMontant(totaux.depenses)}
+              icon={<ArrowDown />}
+            />
+            <Statistique
+              titre="Total recette"
+              valeur={loading ? "—" : formatMontant(totaux.recettes)}
+              icon={<Wallet />}
+            />
+          </section>
 
-          {loading && (
-            <div className="mt-6 flex items-center gap-2 text-slate-500">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Chargement des encaissements...
-            </div>
-          )}
-
-          {!loading && error && <p className="mt-6 text-sm text-rose-600">{error}</p>}
-
-          {!loading && !error && (
-            <>
-              <div className="mt-5 grid gap-4 sm:grid-cols-3">
-                <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Encaissé aujourd&apos;hui
-                  </p>
-                  <p className="mt-2 text-2xl font-bold text-slate-800">
-                    {formatMontant(totaux.jour, devise)}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    {totaux.nombreJour} encaissement{totaux.nombreJour > 1 ? "s" : ""}
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Encaissé ce mois
-                  </p>
-                  <p className="mt-2 text-2xl font-bold text-slate-800">
-                    {formatMontant(totaux.mois, devise)}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    {reference.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Total encaissé
-                  </p>
-                  <p className="mt-2 text-2xl font-bold text-slate-800">
-                    {formatMontant(totaux.total, devise)}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    {encaissements.length} versement{encaissements.length > 1 ? "s" : ""}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+          <section className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <div className="space-y-1">
+                <label htmlFor="caisse-date-debut" className="text-xs text-muted-foreground">Du</label>
                 <div className="relative">
-                  <Search
-                    size={16}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                  />
-                  <input
-                    value={recherche}
-                    onChange={(e) => setRecherche(e.target.value)}
-                    placeholder="Rechercher un client, un numéro..."
-                    className="w-[300px] rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20"
+                  <CalendarDays className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-blue-600" />
+                  <Input
+                    id="caisse-date-debut"
+                    aria-label="Date de début"
+                    type="date"
+                    value={dateDebut}
+                    onChange={(event) => setDateDebut(event.target.value)}
+                    className="h-9 border-slate-200 bg-white pl-9 focus-visible:border-blue-600 focus-visible:ring-blue-600/20"
                   />
                 </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={exporterExcel}
-                    disabled={filtres.length === 0}
-                    className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <Download size={16} />
-                    Exporter Excel
-                  </button>
-
-                  {PERIODES.map((item) => (
-                    <button
-                      key={item.valeur}
-                      type="button"
-                      onClick={() => setPeriode(item.valeur)}
-                      className={`rounded-lg px-3.5 py-2 text-sm font-medium transition ${
-                        periode === item.valeur
-                          ? "bg-blue-600 text-white shadow-sm shadow-blue-600/20"
-                          : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                      }`}
-                    >
-                      {item.libelle}
-                    </button>
-                  ))}
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="caisse-date-fin" className="text-xs text-muted-foreground">Au</label>
+                <div className="relative">
+                  <CalendarDays className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-blue-600" />
+                  <Input
+                    id="caisse-date-fin"
+                    aria-label="Date de fin"
+                    type="date"
+                    value={dateFin}
+                    onChange={(event) => setDateFin(event.target.value)}
+                    className="h-9 border-slate-200 bg-white pl-9 focus-visible:border-blue-600 focus-visible:ring-blue-600/20"
+                  />
                 </div>
               </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                onClick={() => {
+                  setDateDebut("");
+                  setDateFin("");
+                }}
+                disabled={!dateDebut && !dateFin}
+                aria-label="Réinitialiser la période"
+                className="h-9"
+              >
+                <RotateCcw />
+                Réinitialiser la période
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setLoading(true);
+                  void load();
+                }}
+                disabled={loading}
+                className="border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+              >
+                <RefreshCw className={loading ? "animate-spin" : ""} />
+                Actualiser
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={exporter}
+                disabled={loading}
+                className="border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+              >
+                <Download />
+                Exporter Excel
+              </Button>
+            </div>
+          </section>
 
-              <div className="mt-4 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                    <tr>
-                      <th className="px-4 py-3 font-semibold">Date</th>
-                      <th className="px-4 py-3 font-semibold">Client</th>
-                      <th className="px-4 py-3 font-semibold">N° abonnement</th>
-                      <th className="px-4 py-3 font-semibold">Offre</th>
-                      <th className="px-4 py-3 font-semibold">Méthode</th>
-                      <th className="px-4 py-3 text-right font-semibold">Montant</th>
-                      <th className="px-4 py-3 text-center font-semibold">Reçu</th>
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y divide-gray-100">
-                    {filtres.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-50/60">
-                        <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                          {item.datePaiement
-                            ? item.datePaiement.toLocaleDateString("fr-FR")
-                            : "—"}
-                        </td>
-                        <td className="px-4 py-3 font-medium text-slate-800">{item.client}</td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {item.numero_abonnement || `#${item.abonnement_id}`}
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">{item.offre || "—"}</td>
-                        <td className="px-4 py-3 text-slate-600">{item.methode || "—"}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-800">
-                          {formatMontant(item.montant, devise)}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <Link
-                            to={`/recu/${item.id}`}
-                            title="Imprimer le reçu"
-                            className="inline-flex rounded-lg p-1.5 text-blue-600 transition hover:bg-blue-50"
-                          >
-                            <Printer size={16} />
-                          </Link>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-
-                  {filtres.length > 0 && (
-                    <tfoot className="border-t border-gray-100 bg-slate-50">
-                      <tr>
-                        <td
-                          className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500"
-                          colSpan={5}
-                        >
-                          Total ({filtres.length})
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right font-bold text-slate-800">
-                          {formatMontant(totalFiltre, devise)}
-                        </td>
-                        <td />
-                      </tr>
-                    </tfoot>
-                  )}
-                </table>
-
-                {filtres.length === 0 && (
-                  <div className="flex flex-col items-center gap-2 px-6 py-14 text-center">
-                    <Wallet className="text-slate-300" size={28} />
-                    <p className="text-sm text-slate-500">
-                      Aucun encaissement pour cette période.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </>
+          {datesInvalides && (
+            <p role="alert" className="text-sm text-destructive">
+              La date de début doit précéder la date de fin.
+            </p>
           )}
-        </div>
+          {error && (
+            <p role="alert" className="rounded-md border border-destructive/20 p-3 text-sm text-destructive">
+              {error}
+            </p>
+          )}
+
+          <Card className="gap-0 overflow-hidden border-slate-200 bg-white py-0 shadow-sm shadow-slate-200/50">
+            <CardHeader className="gap-3 border-b px-4 py-4 sm:flex sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <div className="space-y-1">
+                <CardTitle className="text-base font-semibold text-slate-900">Liste des opérations</CardTitle>
+                <CardDescription className="text-xs text-slate-500">
+                  Paiements d’abonnement et opérations de caisse
+                </CardDescription>
+              </div>
+              <div className="relative w-full sm:max-w-xs">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-blue-600" />
+                <Input
+                  type="search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Rechercher..."
+                  aria-label="Rechercher une opération"
+                  className="h-9 border-slate-200 bg-white pl-9 focus-visible:border-blue-600 focus-visible:ring-blue-600/20"
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table className="min-w-[900px]">
+                  <TableHeader className="bg-blue-50/70">
+                    <TableRow className="text-slate-600">
+                      <TableHead className="w-16 px-4">N°</TableHead>
+                      <TableHead className="px-4">Date</TableHead>
+                      <TableHead className="px-4">Motif</TableHead>
+                      <TableHead className="px-4 text-right">Dépense</TableHead>
+                      <TableHead className="px-4 text-right">Recette</TableHead>
+                      <TableHead className="px-4 text-right">Solde</TableHead>
+                      <TableHead className="w-16 px-4 text-center">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                          Chargement des opérations...
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {!loading && operationsVisibles.map((operation, index) => (
+                      <TableRow key={operation.id} className="hover:bg-blue-50/50">
+                        <TableCell className="px-4 text-muted-foreground">
+                          {String(index + 1).padStart(3, "0")}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap px-4 text-muted-foreground">
+                          {formatDate(operation.date_operation)}
+                        </TableCell>
+                        <TableCell className="max-w-[360px] px-4">
+                          <span className="block truncate">{operation.motif}</span>
+                          {operation.client && (
+                            <span className="block truncate text-xs text-muted-foreground">{operation.client}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap px-4 text-right tabular-nums">
+                          {formatMontant(operation.type === "DEPENSE" ? parseMontant(operation.montant) : 0)}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap px-4 text-right tabular-nums">
+                          {formatMontant(operation.type === "RECETTE" ? parseMontant(operation.montant) : 0)}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap px-4 text-right font-semibold tabular-nums text-slate-900">
+                          {formatMontant(operation.solde)}
+                        </TableCell>
+                        <TableCell className="px-4 text-center">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label={`Actions pour ${operation.motif}`}
+                                  className="text-slate-500 hover:bg-blue-50 hover:text-blue-700"
+                                />
+                              }
+                            >
+                              <MoreVertical />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              {operation.source === "paiement" ? (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={() => navigate(`/recu/${operation.source_id}`)}
+                                    className="focus:bg-blue-50 focus:text-blue-700"
+                                  >
+                                    <Eye className="text-blue-600" />
+                                    Aperçu du reçu
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => navigate(`/recu/${operation.source_id}?imprimer=1`)}
+                                    className="focus:bg-blue-50 focus:text-blue-700"
+                                  >
+                                    <Printer className="text-blue-600" />
+                                    Imprimer le reçu
+                                  </DropdownMenuItem>
+                                </>
+                              ) : (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={() => setOperationAVisualiser(operation)}
+                                    className="focus:bg-blue-50 focus:text-blue-700"
+                                  >
+                                    <Eye className="text-blue-600" />
+                                    Aperçu
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => setOperationAModifier(operation)}
+                                    className="focus:bg-blue-50 focus:text-blue-700"
+                                  >
+                                    <Pencil className="text-blue-600" />
+                                    Modifier
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => setOperationAImprimer(operation)}
+                                    className="focus:bg-blue-50 focus:text-blue-700"
+                                  >
+                                    <Printer className="text-blue-600" />
+                                    Imprimer
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onClick={() => setOperationASupprimer(operation)}
+                              >
+                                <Trash2 />
+                                Supprimer
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {!loading && operationsVisibles.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                          {operations.length === 0
+                            ? "Aucune opération enregistrée."
+                            : "Aucune opération pour ces filtres."}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+            <div className="border-t px-4 py-3 text-sm text-muted-foreground">
+              {operationsVisibles.length} opération{operationsVisibles.length > 1 ? "s" : ""}
+            </div>
+          </Card>
+
+          <section className="grid gap-4 lg:grid-cols-2" aria-label="Ajouter une opération">
+            <FormulaireOperation type="RECETTE" onCreated={load} />
+            <FormulaireOperation type="DEPENSE" onCreated={load} />
+          </section>
+        </main>
       </div>
+
+      {operationAImprimer && (
+        <div id="operation-a-imprimer" className="hidden print:block">
+          <h1 className="text-2xl font-bold">Opération de caisse</h1>
+          <p className="mt-6"><strong>Type :</strong> {operationAImprimer.type === "RECETTE" ? "Recette" : "Dépense"}</p>
+          <p className="mt-3"><strong>Date :</strong> {formatDate(operationAImprimer.date_operation)}</p>
+          <p className="mt-3"><strong>Motif :</strong> {operationAImprimer.motif}</p>
+          <p className="mt-3"><strong>Montant :</strong> {formatMontant(parseMontant(operationAImprimer.montant))}</p>
+          <p className="mt-3"><strong>Solde après opération :</strong> {formatMontant(operationAImprimer.solde)}</p>
+        </div>
+      )}
+
+      {operationAModifier && (
+        <ModifierOperationDialog
+          key={operationAModifier.id}
+          operation={operationAModifier}
+          onClose={() => setOperationAModifier(null)}
+          onSaved={load}
+        />
+      )}
+
+      <Dialog
+        open={Boolean(operationAVisualiser)}
+        onOpenChange={(open) => {
+          if (!open) setOperationAVisualiser(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Aperçu de l’opération</DialogTitle>
+            <DialogDescription>Détails de l’opération sélectionnée.</DialogDescription>
+          </DialogHeader>
+          {operationAVisualiser && (
+            <dl className="grid gap-3 text-sm">
+              <div><dt className="text-muted-foreground">Type</dt><dd className="font-medium">{operationAVisualiser.type === "RECETTE" ? "Recette" : "Dépense"}</dd></div>
+              <div><dt className="text-muted-foreground">Date</dt><dd className="font-medium">{formatDate(operationAVisualiser.date_operation)}</dd></div>
+              <div><dt className="text-muted-foreground">Motif</dt><dd className="font-medium">{operationAVisualiser.motif}</dd></div>
+              <div><dt className="text-muted-foreground">Montant</dt><dd className="font-medium">{formatMontant(parseMontant(operationAVisualiser.montant))}</dd></div>
+              <div><dt className="text-muted-foreground">Solde après opération</dt><dd className="font-medium">{formatMontant(operationAVisualiser.solde)}</dd></div>
+            </dl>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOperationAVisualiser(null)}>
+              Fermer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={Boolean(operationASupprimer)}
+        onOpenChange={(open) => {
+          if (!open) setOperationASupprimer(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cette opération ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {operationASupprimer
+                ? `« ${operationASupprimer.motif} » sera supprimée définitivement.`
+                : "Cette action est définitive."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (operationASupprimer) void supprimer(operationASupprimer);
+                setOperationASupprimer(null);
+              }}
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

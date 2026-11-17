@@ -21,11 +21,13 @@ export const CardFront: React.FC<CardFrontProps> = ({ data, className = "" }) =>
     key: keyof SubscriberData;
     label: string;
     y: number;
+    valueX: number;
+    valueFontSize: number;
     icon: "user" | "badge" | "calendar";
   }> = [
-    { key: "nom", label: "Nom :", y: 247, icon: "user" },
-    { key: "numeroAbonne", label: "N° Abonné :", y: 323, icon: "badge" },
-    { key: "validite", label: "Validité :", y: 399, icon: "calendar" },
+    { key: "nom", label: "Nom :", y: 247, valueX: 475, valueFontSize: 27, icon: "user" },
+    { key: "numeroAbonne", label: "N° Abonné :", y: 323, valueX: 560, valueFontSize: 27, icon: "badge" },
+    { key: "validite", label: "Validité :", y: 399, valueX: 520, valueFontSize: 20, icon: "calendar" },
   ];
 
   return (
@@ -233,11 +235,11 @@ export const CardFront: React.FC<CardFrontProps> = ({ data, className = "" }) =>
                 </text>
 
                 <text
-                  x="600"
+                  x={row.valueX}
                   y={cy + 13}
                   fontFamily="'Open Sans', sans-serif"
                   fontWeight="700"
-                  fontSize="27"
+                  fontSize={row.valueFontSize}
                   fill="#0b2868"
                 >
                   {data[row.key]}

@@ -179,7 +179,7 @@ export default function Clientform() {
                 <button
                   type="button"
                   onClick={navigateclient}
-                  className="w-45 rounded-lg bg-gray-100"
+                  className="w-45 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100"
                 >
                   Annuler
                 </button>
@@ -188,7 +188,7 @@ export default function Clientform() {
                   <button
                     type="submit"
                     disabled={saving || loading}
-                    className="h-10 w-45 rounded-md bg-blue-500 py-2 text-white hover:bg-blue-600 focus:outline-none disabled:opacity-60"
+                    className="h-10 w-45 rounded-md bg-blue-600 py-2 text-white hover:bg-blue-700 focus:outline-none disabled:opacity-60"
                   >
                     {saving ? "Enregistrement..." : "Enregistrer"}
                   </button>

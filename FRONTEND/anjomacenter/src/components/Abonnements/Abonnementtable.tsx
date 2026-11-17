@@ -1,6 +1,48 @@
 import { useEffect, useMemo, useState } from "react";
-import { CreditCard, Pencil, Trash2, ChevronLeft, ChevronRight, Wallet } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  CreditCard,
+  MoreVertical,
+  Pencil,
+  Printer,
+  Trash2,
+  Wallet,
+} from "lucide-react";
 import PaiementsModal from "../Paiements/PaiementsModal";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
+import { Button } from "../ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../ui/table";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
 import { type Abonnement } from "../../types/abonemment";
 import { useNavigate } from "react-router-dom";
 
@@ -15,6 +57,12 @@ const parseMontant = (valeur?: string | number): number => {
 const formatMontant = (valeur: number) =>
   valeur.toLocaleString("fr-FR").replace(/\u202f|\u00a0/g, " ");
 
+const formatDate = (valeur?: string) => {
+  if (!valeur) return "—";
+  const iso = /^(\d{4})-(\d{2})-(\d{2})(?:$|T)/.exec(valeur);
+  return iso ? `${iso[3]}/${iso[2]}/${iso[1]}` : valeur;
+};
+
 export default function AbonnementTable({
   items,
   onDelete,
@@ -27,6 +75,7 @@ export default function AbonnementTable({
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
   const [paiementDe, setPaiementDe] = useState<Abonnement | null>(null);
+  const [abonnementASupprimer, setAbonnementASupprimer] = useState<Abonnement | null>(null);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -45,50 +94,46 @@ export default function AbonnementTable({
   };
 
   return (
-    <div className="mt-6 flex w-full flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-      <div className="border-b border-gray-100 px-6 py-5">
-        <h2 className="text-lg font-semibold text-gray-800">Liste des abonnements</h2>
-        <p className="mt-1 text-sm text-gray-500">
+    <Card className="w-full gap-0 overflow-hidden border-border/70 py-0 shadow-none">
+      <CardHeader className="border-b px-5 py-4 sm:px-6">
+        <CardTitle className="text-base font-semibold">Liste des abonnements</CardTitle>
+        <CardDescription className="text-xs">
           Consultez et gérez les abonnements des clients
-        </p>
-      </div>
+        </CardDescription>
+      </CardHeader>
 
-      <div className="flex-1 overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-gray-50">
-            <tr className="text-gray-500">
-              <th className="px-4 py-4 font-medium">N° Abonnement</th>
-              <th className="px-4 py-4 font-medium">Client</th>
-              <th className="px-4 py-4 font-medium">Offre</th>
-              <th className="px-4 py-4 font-medium">Prix</th>
-              <th className="px-4 py-4 font-medium">Date début</th>
-              <th className="px-4 py-4 font-medium">Date fin</th>
-              <th className="px-4 py-4 font-medium">Observation</th>
-              <th className="px-4 py-4 font-medium">Statut</th>
-              <th className="px-4 py-4 text-center font-medium">Actions</th>
-            </tr>
-          </thead>
+      <CardContent className="min-w-0 p-0">
+        <Table className="min-w-[1100px] text-left text-sm">
+          <TableHeader className="bg-muted/30">
+            <TableRow className="text-muted-foreground">
+              <TableHead className="px-4 py-4 font-medium">N° Abonnement</TableHead>
+              <TableHead className="px-4 py-4 font-medium">Client</TableHead>
+              <TableHead className="px-4 py-4 font-medium">Offre</TableHead>
+              <TableHead className="px-4 py-4 font-medium">Prix</TableHead>
+              <TableHead className="px-4 py-4 font-medium">Date début</TableHead>
+              <TableHead className="px-4 py-4 font-medium">Date fin</TableHead>
+              <TableHead className="px-4 py-4 font-medium">Observation</TableHead>
+              <TableHead className="px-4 py-4 font-medium">Statut</TableHead>
+              <TableHead className="px-4 py-4 text-center font-medium">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
 
-          <tbody className="divide-y divide-gray-100">
+          <TableBody className="divide-y divide-gray-100">
             {currentItems.map((abonnement) => {
               const statut = (abonnement.statut ?? "").toUpperCase();
               const actif = statut === "ACTIF";
               return (
-                <tr key={abonnement.id} className="transition-colors hover:bg-gray-50">
-                  <td className="px-4 py-4">
-                    <div className="font-medium text-gray-800">{abonnement.numero_abonnement || `#${abonnement.id}`}</div>
-                    <div className="text-xs text-gray-400">ID {abonnement.id}</div>
-                  </td>
-                  <td className="px-4 py-4 font-medium text-gray-800">{abonnement.client}</td>
-                  <td className="px-4 py-4">
-                    <span className="whitespace-nowrap rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600">
-                      {abonnement.offre}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-4">
-                    <div className="font-medium text-gray-800">{abonnement.prix}</div>
+                <TableRow key={abonnement.id} className="transition-colors hover:bg-muted/40">
+                  <TableCell className="px-4 py-4">
+                    <div className="font-medium">{abonnement.numero_abonnement || `#${abonnement.id}`}</div>
+                    <div className="text-xs text-muted-foreground">ID {abonnement.id}</div>
+                  </TableCell>
+                  <TableCell className="px-4 py-4 font-medium">{abonnement.client}</TableCell>
+                  <TableCell className="whitespace-nowrap px-4 py-4">{abonnement.offre}</TableCell>
+                  <TableCell className="whitespace-nowrap px-4 py-4">
+                    <div className="font-medium">{abonnement.prix}</div>
                     {parseMontant(abonnement.montant_paye) > 0 && (
-                      <div className="text-xs text-gray-400">
+                      <div className="text-xs text-muted-foreground">
                         Payé {formatMontant(parseMontant(abonnement.montant_paye))}
                         {" · "}Reste{" "}
                         {formatMontant(
@@ -96,99 +141,120 @@ export default function AbonnementTable({
                         )}
                       </div>
                     )}
-                  </td>
-                  <td className="px-4 py-4 text-gray-600">{abonnement.dateDebut}</td>
-                  <td className="px-4 py-4 text-gray-600">{abonnement.dateFin}</td>
-                  <td className="max-w-[200px] px-4 py-4 text-gray-500">
+                  </TableCell>
+                  <TableCell className="px-4 py-4 text-muted-foreground">{formatDate(abonnement.dateDebut)}</TableCell>
+                  <TableCell className="px-4 py-4 text-muted-foreground">{formatDate(abonnement.dateFin)}</TableCell>
+                  <TableCell className="max-w-[200px] px-4 py-4 text-muted-foreground">
                     <span className="block truncate">{abonnement.observation}</span>
-                  </td>
-                  <td className="px-4 py-4">
-                    <span
-                      className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-medium ${
-                        actif ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      <span className={`h-1.5 w-1.5 rounded-full ${actif ? "bg-green-500" : "bg-red-500"}`} />
+                  </TableCell>
+                  <TableCell className="px-4 py-4">
+                    <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                      <span className={`h-1.5 w-1.5 rounded-full ${actif ? "bg-emerald-500" : "bg-muted-foreground/50"}`} />
                       {abonnement.statut || "—"}
                     </span>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        type="button"
-                        title="Paiements"
-                        onClick={() => setPaiementDe(abonnement)}
-                        className="rounded-lg p-2 text-amber-600 transition-colors hover:bg-amber-50"
-                      >
-                        <Wallet size={17} />
-                      </button>
-                      <button
-                        type="button"
-                        title="Générer la carte"
-                        onClick={() => navigate(`/carte/${abonnement.id}`)}
-                        className="rounded-lg p-2 text-emerald-600 transition-colors hover:bg-emerald-50"
-                      >
-                        <CreditCard size={17} />
-                      </button>
-                      <button
-                        type="button"
-                        title="Modifier"
-                        onClick={() => navigate(`/abonnementform/${abonnement.id}`)}
-                        className="rounded-lg p-2 text-blue-600 transition-colors hover:bg-blue-50"
-                      >
-                        <Pencil size={17} />
-                      </button>
-                      <button
-                        type="button"
-                        title="Supprimer"
-                        onClick={() => onDelete(abonnement)}
-                        className="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50"
-                      >
-                        <Trash2 size={17} />
-                      </button>
+                  </TableCell>
+                  <TableCell className="px-4 py-4">
+                    <div className="flex justify-center">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Actions pour ${abonnement.client}`}
+                              className="text-slate-500 hover:bg-blue-50 hover:text-blue-700"
+                            />
+                          }
+                        >
+                          <MoreVertical />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-52">
+                          <DropdownMenuItem
+                            onClick={() => setPaiementDe(abonnement)}
+                            className="focus:bg-blue-50 focus:text-blue-700"
+                          >
+                            <Wallet className="text-blue-600" />
+                            Paiements
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => navigate(`/carte/${abonnement.id}`)}
+                            className="focus:bg-blue-50 focus:text-blue-700"
+                          >
+                            <CreditCard className="text-blue-600" />
+                            Aperçu de la carte
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => navigate(`/carte/${abonnement.id}?imprimer=1`)}
+                            className="focus:bg-blue-50 focus:text-blue-700"
+                          >
+                            <Printer className="text-blue-600" />
+                            Imprimer la carte
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => navigate(`/abonnementform/${abonnement.id}`)}
+                            className="focus:bg-blue-50 focus:text-blue-700"
+                          >
+                            <Pencil className="text-blue-600" />
+                            Modifier
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => setAbonnementASupprimer(abonnement)}
+                          >
+                            <Trash2 />
+                            Supprimer
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               );
             })}
             {currentItems.length === 0 && (
-              <tr>
-                <td colSpan={9} className="px-6 py-10 text-center text-slate-500">
+              <TableRow>
+                <TableCell colSpan={9} className="px-6 py-10 text-center text-slate-500">
                   Aucun abonnement.
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             )}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </CardContent>
 
-      <div className="flex shrink-0 items-center justify-between border-t border-gray-100 px-4 py-4">
-        <p className="text-sm text-gray-500">
-          Total : <span className="font-semibold text-gray-700">{items.length}</span> abonnements
+      <div className="flex shrink-0 items-center justify-between border-t px-4 py-4">
+        <p className="text-sm text-muted-foreground">
+          {items.length} abonnement{items.length > 1 ? "s" : ""}
         </p>
 
         <div className="flex items-center gap-2">
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
             onClick={() => goToPage(safePage - 1)}
             disabled={safePage === 1}
-            className="rounded-lg border border-gray-200 p-2 text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Page précédente"
           >
-            <ChevronLeft size={18} />
-          </button>
+            <ChevronLeft />
+          </Button>
 
-          <span className="px-2 text-sm text-gray-600">
+          <span className="px-2 text-sm text-muted-foreground">
             {safePage} / {totalPages}
           </span>
 
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
             onClick={() => goToPage(safePage + 1)}
             disabled={safePage === totalPages}
-            className="rounded-lg border border-gray-200 p-2 text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Page suivante"
           >
-            <ChevronRight size={18} />
-          </button>
+            <ChevronRight />
+          </Button>
         </div>
       </div>
 
@@ -199,6 +265,36 @@ export default function AbonnementTable({
           onChanged={onPaymentChange}
         />
       )}
-    </div>
+
+      <AlertDialog
+        open={Boolean(abonnementASupprimer)}
+        onOpenChange={(open) => {
+          if (!open) setAbonnementASupprimer(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cet abonnement ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {abonnementASupprimer
+                ? `L'abonnement de ${abonnementASupprimer.client} sera supprimé définitivement.`
+                : "Cette action est définitive."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (abonnementASupprimer) onDelete(abonnementASupprimer);
+                setAbonnementASupprimer(null);
+              }}
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
   );
 }

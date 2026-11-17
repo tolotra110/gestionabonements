@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, CreditCard, Loader2, Printer } from "lucide-react";
 import CarteAbonnement from "../../components/cart/CarteAbonnement";
 import { Sidebare } from "../../components/Sidebar/Sidebare";
@@ -14,8 +14,18 @@ function formaterDate(date?: string): string {
   return valeur.toLocaleDateString("fr-FR");
 }
 
+function formaterPeriode(dateDebut?: string, dateFin?: string): string {
+  const debut = formaterDate(dateDebut);
+  const fin = formaterDate(dateFin);
+  if (debut && fin) return `${debut} au ${fin}`;
+  return debut || fin;
+}
+
 export default function Cartes() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const imprimerAutomatiquement = searchParams.get("imprimer") === "1";
+  const impressionLancee = useRef<string | null>(null);
   const [abonnement, setAbonnement] = useState<Abonnement | null>(null);
   const [abonnements, setAbonnements] = useState<Abonnement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +60,22 @@ export default function Cartes() {
       ignore = true;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (
+      !imprimerAutomatiquement ||
+      !id ||
+      loading ||
+      error ||
+      !abonnement ||
+      impressionLancee.current === id
+    ) {
+      return;
+    }
+
+    impressionLancee.current = id;
+    window.setTimeout(() => window.print(), 100);
+  }, [abonnement, error, id, imprimerAutomatiquement, loading]);
 
   return (
     <div className="flex">
@@ -100,7 +126,7 @@ export default function Cartes() {
             <CarteAbonnement
               nom={abonnement.client}
               numeroAbonne={abonnement.numero_abonnement || `#${abonnement.id}`}
-              validite={formaterDate(abonnement.dateFin)}
+              validite={formaterPeriode(abonnement.dateDebut, abonnement.dateFin)}
             />
           )}
 
@@ -130,7 +156,7 @@ export default function Cartes() {
                   </div>
 
                   <p className="text-sm text-slate-500">
-                    Valide jusqu&apos;au {formaterDate(item.dateFin)}
+                    Valide du {formaterPeriode(item.dateDebut, item.dateFin)}
                   </p>
 
                   <Link

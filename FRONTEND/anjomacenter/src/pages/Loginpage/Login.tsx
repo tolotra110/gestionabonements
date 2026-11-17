@@ -1,19 +1,35 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import login from "../../assets/images/login.png";
 import logo from "../../assets/images/anjoma.jpg";
+import { useAuth } from "../../contexts/auth";
 
 export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { login: authenticate, loading, user, sessionError } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    if (!loading && user) navigate("/dashboard", { replace: true });
+  }, [loading, navigate, user]);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log("Login attempt:", { email, password });
-    navigate("/client");
+    try {
+      setSubmitting(true);
+      setError(null);
+      await authenticate(email, password);
+      navigate("/dashboard", { replace: true });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Connexion impossible");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -42,6 +58,11 @@ export function Login() {
         </div>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+          {(error || sessionError) && (
+            <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
+              {error || sessionError}
+            </p>
+          )}
           <div>
             <label htmlFor="email" className="block text-sm font-semibold text-slate-700">
               Adresse e-mail
@@ -88,38 +109,17 @@ export function Login() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <input
-                id="remember"
-                type="checkbox"
-                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-600"
-              />
-              <label htmlFor="remember" className="text-sm text-slate-700">Se souvenir de moi</label>
-            </div>
-
-            <Link to="#" className="text-sm font-semibold text-blue-600 transition hover:text-blue-700">
-              Mot de passe oublié ?
-            </Link>
-          </div>
-
           <button
             type="submit"
-            className="w-full rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition hover:bg-blue-700 hover:shadow-xl"
+            disabled={submitting || loading}
+            className="w-full rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition hover:bg-blue-700 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Se connecter
+            {submitting ? "Connexion..." : "Se connecter"}
           </button>
         </form>
 
         <p className="mt-5 text-center text-sm text-slate-600">
-          Vous n'avez pas de compte ?
-          <Link
-            to="/register"
-            className="font-semibold text-blue-600 transition hover:text-blue-700"
-          >
-            {" "}
-            Créer un compte
-          </Link>
+          Accès réservé aux comptes autorisés.
         </p>
       </div>
     </div>

@@ -79,7 +79,7 @@ export default function ClientCard({
               size={15}
               className="text-gray-400"
             />
-            {client.abonnement}
+            {client.abonnement || "Abonnement non renseigné"}
           </p>
 
           <p className="flex items-center gap-1.5 text-xs text-gray-500">
@@ -87,7 +87,7 @@ export default function ClientCard({
               size={13}
               className="text-gray-400"
             />
-            {client.telephone}
+            {client.telephone || "Téléphone non renseigné"}
           </p>
 
           <p className="flex items-center gap-1.5 text-xs text-gray-500">
@@ -95,7 +95,7 @@ export default function ClientCard({
               size={13}
               className="text-gray-400"
             />
-            {client.Adresse}
+            {client.Adresse || "Adresse non renseignée"}
           </p>
 
         </div>
@@ -108,7 +108,7 @@ export default function ClientCard({
             type="button"
             onClick={() => onView?.(client)}
             title="Voir le client"
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-gray-50 hover:text-blue-600"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
           >
             <Eye size={15} />
           </button>
@@ -118,7 +118,7 @@ export default function ClientCard({
             type="button"
             onClick={() => onEdit?.(client)}
             title="Modifier"
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-gray-50 hover:text-blue-600"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
           >
             <Pencil size={15} />
           </button>
@@ -128,7 +128,7 @@ export default function ClientCard({
             type="button"
             onClick={() => setShowObservation(true)}
             title="Observation"
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-gray-50 hover:text-blue-600"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
           >
             <MessageSquare size={15} />
           </button>
@@ -216,7 +216,7 @@ export default function ClientCard({
             <button
               type="button"
               onClick={() => setShowObservation(false)}
-              className="mt-5 w-full rounded-lg bg-blue-500 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-600"
+              className="mt-5 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700"
             >
               Fermer
             </button>

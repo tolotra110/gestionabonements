@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "anjomacenter-backend",
   "version": "1.0.0",
   "main": "src/server.js",
@@ -6,12 +6,15 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "migrate": "node scripts/migrate.js"
+    "migrate": "node scripts/migrate.js",
+    "auth:create-user": "node scripts/createUser.js"
   },
   "dependencies": {
-    "express": "^4.21.2",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.3",
     "pg": "^8.13.1"
   },
   "devDependencies": {

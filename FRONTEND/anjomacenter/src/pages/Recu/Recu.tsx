@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Loader2, Printer, Wifi } from "lucide-react";
 import { paiementService } from "../../services/paiementService";
 import { parametreService } from "../../services/parametreService";
@@ -24,6 +24,9 @@ const formatDate = (valeur?: string) => {
 
 export default function Recu() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const imprimerAutomatiquement = searchParams.get("imprimer") === "1";
+  const impressionLancee = useRef<string | null>(null);
   const [paiement, setPaiement] = useState<Paiement | null>(null);
   const [paiementsAbonnement, setPaiementsAbonnement] = useState<Paiement[]>([]);
   const [parametres, setParametres] = useState<Parametres | null>(null);
@@ -61,6 +64,22 @@ export default function Recu() {
       ignore = true;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (
+      !imprimerAutomatiquement ||
+      !id ||
+      loading ||
+      error ||
+      !paiement ||
+      impressionLancee.current === id
+    ) {
+      return;
+    }
+
+    impressionLancee.current = id;
+    window.setTimeout(() => window.print(), 100);
+  }, [error, id, imprimerAutomatiquement, loading, paiement]);
 
   const devise = parametres?.devise || "Ar";
   const prix = parseMontant(paiement?.prix_abonnement);

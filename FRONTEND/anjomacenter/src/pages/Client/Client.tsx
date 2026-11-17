@@ -109,7 +109,7 @@ export function Client() {
             <div className="flex gap-2">
               <button
                 onClick={handleExportExcel}
-                className="flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 text-white hover:bg-green-600"
+                className="flex items-center gap-2 rounded-lg bg-blue-50 px-4 py-2 text-blue-700 hover:bg-blue-100"
               >
                 <FileSpreadsheet size={20} />
                 Export Excel
@@ -117,7 +117,7 @@ export function Client() {
 
               <button
                 onClick={Ajouterclient}
-                className="flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
+                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
               >
                 <PlusCircle size={20} />
                 Nouvel client
@@ -156,7 +156,7 @@ export function Client() {
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={safePage === 1}
-              className="rounded-lg border px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border border-slate-300 px-3 py-2 text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Précédent
             </button>
@@ -168,7 +168,7 @@ export function Client() {
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={safePage === totalPages}
-              className="rounded-lg border px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border border-slate-300 px-3 py-2 text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Suivant
             </button>
@@ -211,18 +211,18 @@ export function Client() {
 
               <div>
                 <p className="text-xs font-medium text-slate-400">TÉLÉPHONE</p>
-                <p className="text-slate-700">{selectedClient.telephone}</p>
+                <p className="text-slate-700">{selectedClient.telephone || "Non renseigné"}</p>
               </div>
 
               <div>
                 <p className="text-xs font-medium text-slate-400">ADRESSE</p>
-                <p className="text-slate-700">{selectedClient.Adresse}</p>
+                <p className="text-slate-700">{selectedClient.Adresse || "Non renseignée"}</p>
               </div>
 
               <div>
                 <p className="text-xs font-medium text-slate-400">ABONNEMENT</p>
                 <span className="inline-block rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-600">
-                  {selectedClient.abonnement}
+                  {selectedClient.abonnement || "Non renseigné"}
                 </span>
               </div>
 
@@ -237,7 +237,7 @@ export function Client() {
             <div className="mt-6 flex justify-end">
               <button
                 onClick={() => setSelectedClient(null)}
-                className="rounded-lg bg-slate-800 px-5 py-2 text-sm font-medium text-white hover:bg-slate-900"
+                className="rounded-lg bg-blue-50 px-5 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
               >
                 Fermer
               </button>

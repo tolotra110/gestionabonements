@@ -33,7 +33,7 @@ export function Navbar  () {
 
         <Link
           to="/login"
-          className="hidden items-center gap-2 rounded-lg bg-slate-800 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 hover:shadow-md md:flex"
+          className="hidden items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 hover:shadow-md md:flex"
         >
           <User className="h-5 w-5" />
           Se connecter

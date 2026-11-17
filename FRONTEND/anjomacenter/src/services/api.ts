@@ -1,17 +1,23 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
+export class ApiError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 async function request(path: string, options: RequestInit = {}) {
   const res = await fetch(`${API_URL}${path}`, {
     headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    credentials: 'include',
     ...options,
   });
   if (!res.ok) {
     let message = `HTTP ${res.status}`;
-    try {
-      const data = await res.json();
-      if (data?.message) message = data.message;
-    } catch {}
-    throw new Error(message);
+    const data = await res.json().catch(() => null);
+    if (typeof data?.message === 'string') message = data.message;
+    throw new ApiError(message, res.status);
   }
   if (res.status === 204) return null;
   return res.json();

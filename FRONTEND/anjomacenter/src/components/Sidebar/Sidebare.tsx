@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboardIcon,
@@ -9,6 +10,7 @@ import {
   LogOutIcon,
 } from "lucide-react";
 import logo from "../../assets/images/anjoma.jpg";
+import { useAuth } from "../../contexts/auth";
 
 const listitem = [
   { id: 1, icone: LayoutDashboardIcon, libelle: "Dashboard", chemin: "/dashboard" },
@@ -21,9 +23,21 @@ const listitem = [
 
 export function Sidebare() {
   const navigate = useNavigate();
+  const { logout } = useAuth();
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+
+  const handleLogout = async () => {
+    setLogoutError(null);
+    try {
+      await logout();
+      navigate("/login", { replace: true });
+    } catch (error) {
+      setLogoutError(error instanceof Error ? error.message : "Impossible de fermer la session.");
+    }
+  };
 
   return (
-    <aside className="flex min-h-screen w-60 shrink-0 flex-col gap-12 bg-slate-900 text-white shadow-[0_8px_30px_rgba(0,0,0,0.4)]">
+    <aside className="sticky top-0 flex h-screen w-60 shrink-0 self-start flex-col gap-12 bg-slate-900 text-white shadow-[0_8px_30px_rgba(0,0,0,0.4)]">
       <div className="flex h-20 items-center gap-3 border-b border-slate-700 px-5">
         <img
           src={logo}
@@ -55,9 +69,10 @@ export function Sidebare() {
           </NavLink>
         ))}
 
+        {logoutError && <p role="alert" className="px-3 text-xs text-rose-300">{logoutError}</p>}
         <button
           type="button"
-          onClick={() => navigate("/login")}
+          onClick={() => void handleLogout()}
           className="mt-auto flex h-10 w-full items-center gap-3 rounded-lg px-3 text-sm transition-colors hover:bg-blue-700"
         >
           <LogOutIcon className="h-5 w-5 shrink-0" />
